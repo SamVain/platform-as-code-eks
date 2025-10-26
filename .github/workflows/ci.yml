@@ -1,0 +1,23 @@
+name: IaC CI
+on: [push, pull_request]
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform fmt and validate
+        run: |
+          terraform -chdir=infra fmt -check
+          terraform -chdir=infra validate
+      - name: TFLint
+        uses: terraform-linters/setup-tflint@v4
+      - run: tflint -f compact
+      - name: tfsec
+        uses: aquasecurity/tfsec-action@v1
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Actionlint
+        uses: raven-actions/actionlint@v1
