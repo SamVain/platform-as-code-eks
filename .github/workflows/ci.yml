@@ -1,23 +1,54 @@
 name: IaC CI
 on: [push, pull_request]
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Detect whether there are any .tf files. Keeps CI green while the repo is still a skeleton.
+      - name: Detect Terraform files
+        id: detect
+        run: |
+          if ls infra/*.tf >/dev/null 2>&1; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
       - uses: hashicorp/setup-terraform@v3
+        if: steps.detect.outputs.found == 'true'
+        with:
+          terraform_wrapper: false
+
+      # Light init that does not touch backends or AWS
+      - name: Terraform init
+        if: steps.detect.outputs.found == 'true'
+        run: terraform -chdir=infra init -backend=false -input=false
+
       - name: Terraform fmt and validate
+        if: steps.detect.outputs.found == 'true'
         run: |
           terraform -chdir=infra fmt -check
           terraform -chdir=infra validate
-      - name: TFLint
+
+      - name: TFLint install
+        if: steps.detect.outputs.found == 'true'
         uses: terraform-linters/setup-tflint@v4
-      - run: tflint -f compact
+
+      - name: TFLint init and run
+        if: steps.detect.outputs.found == 'true'
+        run: |
+          tflint --init
+          tflint -f compact
+
       - name: tfsec
+        if: steps.detect.outputs.found == 'true'
         uses: aquasecurity/tfsec-action@v1.0.3
+
   policy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Actionlint
-        uses: raven-actions/actionlint@v1
+      - uses: raven-actions/actionlint@v1
