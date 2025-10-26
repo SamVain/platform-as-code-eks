@@ -7,14 +7,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Detect whether there are any .tf files. Keeps CI green while the repo is still a skeleton.
+      # Robust TF file detection (actionlint/ShellCheck friendly)
       - name: Detect Terraform files
         id: detect
+        shell: bash
         run: |
-          if ls infra/*.tf >/dev/null 2>&1; then
-            echo "found=true" >> $GITHUB_OUTPUT
+          shopt -s nullglob
+          files=(infra/*.tf)
+          if (( ${#files[@]} > 0 )); then
+            echo "found=true" >> "$GITHUB_OUTPUT"
           else
-            echo "found=false" >> $GITHUB_OUTPUT
+            echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: hashicorp/setup-terraform@v3
@@ -22,8 +25,7 @@ jobs:
         with:
           terraform_wrapper: false
 
-      # Light init that does not touch backends or AWS
-      - name: Terraform init
+      - name: Terraform init (no backend)
         if: steps.detect.outputs.found == 'true'
         run: terraform -chdir=infra init -backend=false -input=false
 
@@ -51,4 +53,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # actionlint checks this file and shell snippets; passes with the fixes above
       - uses: raven-actions/actionlint@v1
